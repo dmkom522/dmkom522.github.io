@@ -1,0 +1,29 @@
+---
+const pathname = Astro.url.pathname;
+import { siteConfig } from '../config';
+const links = [
+	{ href: '/', label: '首页' },
+	{ href: '/writing/', label: '文章' },
+	{ href: '/projects/', label: '项目' },
+	{ href: '/about/', label: '关于' },
+];
+---
+<header class="site-header">
+	<div class="shell header-inner">
+		<a class="brand" href="/" aria-label={`${siteConfig.name} 首页`}><span>YZ</span><strong>{siteConfig.name}</strong></a>
+		<nav aria-label="主导航">
+			{links.map((link) => <a class:list={{ active: pathname === link.href || (link.href !== '/' && pathname.startsWith(link.href)) }} href={link.href}>{link.label}</a>)}
+		</nav>
+	</div>
+</header>
+<style>
+	.site-header { position: sticky; top: 0; z-index: 10; border-bottom: 1px solid rgba(216,210,199,.8); background: rgba(247,243,234,.88); backdrop-filter: blur(16px); }
+	.header-inner { min-height: 72px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+	.brand { display: inline-flex; align-items: center; gap: 11px; text-decoration: none; }
+	.brand span { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; color: white; background: var(--ink); font-family: Georgia, serif; font-size: .75rem; }
+	.brand strong { font-size: .95rem; letter-spacing: .01em; }
+	nav { display: flex; align-items: center; gap: 6px; }
+	nav a { padding: 8px 11px; border-radius: 9px; color: var(--muted); font-size: .9rem; text-decoration: none; }
+	nav a:hover, nav a.active { color: var(--ink); background: rgba(49,95,159,.09); }
+	@media (max-width: 560px) { .brand strong { display: none; } nav a { padding-inline: 8px; font-size: .84rem; } }
+</style>

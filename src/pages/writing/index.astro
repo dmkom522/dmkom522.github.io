@@ -1,0 +1,20 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+const posts = (await getCollection('writing', ({ data }) => !data.draft)).sort((a, b) => b.data.publishedAt.valueOf() - a.data.publishedAt.valueOf());
+---
+<BaseLayout title="文章 — Yi Zhou" description="关于 AI、计算机视觉、计算机科学与学习过程的文章。">
+	<div class="page shell">
+		<p class="eyebrow">Writing</p><h1 class="display">文章</h1><p class="lead">记录值得长期保留的理解、实验和项目经验。水平到哪，就诚实地写到哪。</p>
+		<section class="list">{posts.map((post) => <article><div class="meta"><time datetime={post.data.publishedAt.toISOString()}>{post.data.publishedAt.toLocaleDateString('zh-CN')}</time><span class="tag">{post.data.tags.join(' · ')}</span></div><h2><a href={`/writing/${post.id}/`}>{post.data.title}</a></h2><p>{post.data.description}</p></article>)}</section>
+	</div>
+</BaseLayout>
+<style>
+	.list { margin-top: 64px; border-top: 1px solid var(--line); }
+	article { position: relative; padding: 30px 0; border-bottom: 1px solid var(--line); }
+	h2 { margin: 8px 0 4px; font-family: Georgia, "Noto Serif SC", serif; font-size: clamp(1.5rem, 3vw, 2.1rem); }
+	h2 a { text-decoration: none; }
+	h2 a::after { content: ""; position: absolute; inset: 0; }
+	article p { margin: 0; color: var(--muted); }
+	article:hover h2 { color: var(--blue); }
+</style>

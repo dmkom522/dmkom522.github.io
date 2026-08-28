@@ -1,0 +1,16 @@
+---
+import { siteConfig } from '../config';
+---
+<footer>
+	<div class="shell footer-inner">
+		<p>© {new Date().getFullYear()} {siteConfig.name}</p>
+		<div><a href={siteConfig.github} rel="me">GitHub</a>{siteConfig.email && <a href={`mailto:${siteConfig.email}`}>Email</a>}</div>
+	</div>
+</footer>
+<style>
+	footer { border-top: 1px solid var(--line); color: var(--muted); }
+	.footer-inner { min-height: 96px; display: flex; align-items: center; justify-content: space-between; gap: 24px; font-size: .88rem; }
+	.footer-inner div { display: flex; gap: 18px; }
+	a { text-underline-offset: 4px; }
+	@media (max-width: 520px) { .footer-inner { align-items: flex-start; flex-direction: column; justify-content: center; gap: 4px; } }
+</style>

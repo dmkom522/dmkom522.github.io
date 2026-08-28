@@ -1,0 +1,11 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { projects } from '../data/projects';
+---
+<BaseLayout title="项目 — Yi Zhou" description="Yi Zhou 的人工智能、计算机视觉与软件项目。">
+	<div class="page shell">
+		<p class="eyebrow">Projects</p><h1 class="display">项目</h1><p class="lead">这里将展示真实问题、我的具体贡献、实验过程与结果，而不只是成品截图。</p>
+		<section class="projects">{projects.length ? <div class="card-grid">{projects.map((project) => <article class="card"><div class="meta"><span>{project.status}</span><span class="tag">{project.tags.join(' · ')}</span></div><h2>{project.href ? <a href={project.href}>{project.title}</a> : project.title}</h2><p>{project.description}</p></article>)}</div> : <div class="empty-state">第一个项目尚未发布。建议从一个已经做过、能够说明问题和实验结果的项目开始。</div>}</section>
+	</div>
+</BaseLayout>
+<style>.projects { margin-top: 64px; }</style>
