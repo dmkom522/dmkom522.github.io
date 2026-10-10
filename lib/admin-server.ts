@@ -1,9 +1,12 @@
 import { env } from "cloudflare:workers";
 import { getChatGPTUser, type ChatGPTUser } from "@/app/chatgpt-auth";
 import { sql, ownerId } from "./server-content";
+import {allowedOrigin} from "./cors";
+import {githubSession} from "./github-session";
 export class HttpError extends Error { constructor(public status: number, message: string) { super(message); } }
 export function json(value: unknown, status = 200) { return Response.json(value, { status, headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } }); }
-export async function requireOwner() {
+export async function requireOwner(request?:Request) {
+  if(request?.headers.has("authorization")){const session=await githubSession(request);if(!session)throw new HttpError(401,"登录已过期，请重新使用 GitHub 登录。");return session;}
   const user = await getChatGPTUser(); if (!user) throw new HttpError(401, "请先使用 ChatGPT 登录。");
   if (await ownerId() !== user.userId) throw new HttpError(403, "只有站主可以管理内容。"); return user;
 }
@@ -20,9 +23,9 @@ export async function initializeOwner() {
 }
 export function checkOrigin(request: Request) {
   const origin = request.headers.get("origin");
-  if (!origin || origin !== new URL(request.url).origin || request.headers.get("sec-fetch-site") === "cross-site") throw new HttpError(403, "请从本站后台提交操作。");
+  if (!origin || !allowedOrigin(request)) throw new HttpError(403, "请从本站后台提交操作。");
 }
 export async function readJson(request: Request) {
   const text = await request.text(); if (text.length > 1_100_000) throw new HttpError(413, "文章过大，请保持在 1 MB 以内。");
-  try { return JSON.parse(text); } catch { throw new HttpError(400, "请求内容格式有误。"); }
+  try {const value=JSON.parse(text);if(!value||typeof value!=="object"||Array.isArray(value))throw new Error();return value;} catch { throw new HttpError(400, "请求内容格式有误。"); }
 }

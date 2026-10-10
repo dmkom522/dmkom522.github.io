@@ -2,6 +2,7 @@ import { sql, bucket, getPost } from "@/lib/server-content";
 import { requireOwner, initializeOwner, json, HttpError, checkOrigin, readJson } from "@/lib/admin-server";
 import { isSection, mediaIds, exampleAbout } from "@/lib/content";
 import { missingImages } from "@/lib/markdown-import";
+import {withCors} from "@/lib/cors";
 
 export const dynamic = "force-dynamic";
 type Context = { params: Promise<{ path?: string[] }> };
@@ -10,7 +11,7 @@ async function handler(request: Request, context: Context): Promise<Response> {
     const path = (await context.params).path ?? []; const method = request.method;
     if (method !== "GET") checkOrigin(request);
     if (path.join("/") === "initialize" && method === "POST") return await initializeOwner();
-    await requireOwner();
+    await requireOwner(request);
     if (path[0] === "status" && method === "GET") return json({ owner: true, initializationClosed: true });
     if (path[0] === "media") {
       if (method === "GET" && path.length === 1) {
@@ -95,4 +96,4 @@ async function handler(request: Request, context: Context): Promise<Response> {
     console.error("Admin request failed",error); return json({error:"服务暂时不可用，编辑内容仍保留，请稍后重试。"},500);
   }
 }
-export const GET=handler; export const POST=handler; export const PUT=handler; export const DELETE=handler;
+const route=withCors(handler);export const GET=route; export const POST=route; export const PUT=route; export const DELETE=route;export const OPTIONS=route;

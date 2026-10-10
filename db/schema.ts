@@ -1,6 +1,8 @@
 import { sqliteTable, text, integer, primaryKey } from "drizzle-orm/sqlite-core";
 
 export const settings = sqliteTable("settings", { key: text("key").primaryKey(), value: text("value").notNull() });
+export const authSessions=sqliteTable("auth_sessions",{tokenHash:text("token_hash").primaryKey(),githubId:text("github_id").notNull(),expiresAt:integer("expires_at").notNull()});
+export const oauthStates=sqliteTable("oauth_states",{stateHash:text("state_hash").primaryKey(),challenge:text("challenge").notNull(),expiresAt:integer("expires_at").notNull()});
 export const posts = sqliteTable("posts", {
   id: text("id").primaryKey(), section: text("section").notNull(), title: text("title").notNull(),
   draftMarkdown: text("draft_markdown").notNull().default(""), draftAvatar: text("draft_avatar"),
