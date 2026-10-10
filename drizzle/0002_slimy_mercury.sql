@@ -1,0 +1,1 @@
+ALTER TABLE `posts` ADD `has_published` integer DEFAULT 0 NOT NULL;

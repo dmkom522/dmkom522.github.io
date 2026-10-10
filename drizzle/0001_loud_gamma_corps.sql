@@ -1,0 +1,1 @@
+ALTER TABLE `posts` ADD `published_section` text;
