@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { Markdown } from "@/app/markdown";
-import { sectionLabels, sections, type Post, type Section } from "@/lib/content";
+import { mediaIds, sectionLabels, sections, type Post, type Section } from "@/lib/content";
 import { missingImages, parseMarkdownFile, resolveImages } from "@/lib/markdown-import";
 import {apiFetch,apiOrigin} from "@/lib/api-client";
 import {PrivateImage} from "@/app/private-image";
@@ -22,13 +22,14 @@ export function AdminEditor({initialized,signOutUrl,onSignOut}:{initialized:bool
   const [saveStatus,setSaveStatus]=useState("准备编辑");const [error,setError]=useState("");const [working,setWorking]=useState("");
   const [pane,setPane]=useState<"edit"|"preview">("edit");const [recovery,setRecovery]=useState<Post|null>(null);
   const [withdrawConfirm,setWithdrawConfirm]=useState(false);
+  const [deleteConfirm,setDeleteConfirm]=useState(false);
   const [importState,setImportState]=useState<ImportState|null>(null);const importCache=useRef(new WeakMap<File,string>());
   const textarea=useRef<HTMLTextAreaElement>(null);const imagesInput=useRef<HTMLInputElement>(null);const avatarInput=useRef<HTMLInputElement>(null);const importInput=useRef<HTMLInputElement>(null);const folderInput=useRef<HTMLInputElement>(null);const repairInput=useRef<HTMLInputElement>(null);
   const saveFunction=useRef<(force?:boolean)=>Promise<boolean>>(async()=>false);
   const dirty=Boolean(post&&signature(post)!==savedSignature.current);
   const missing=post?missingImages(post.draft_markdown):[];
 
-  function setCurrent(next:Post|null){latest.current=next;setPost(next);}
+  function setCurrent(next:Post|null){if(latest.current?.id!==next?.id){setWithdrawConfirm(false);setDeleteConfirm(false);}latest.current=next;setPost(next);}
   function backup(next:Post){try{localStorage.setItem(`blog-draft-${next.id}`,JSON.stringify({...next,backup_at:Date.now()}));}catch{}}
   function edit(patch:Partial<Post>){if(!latest.current)return;const next={...latest.current,...patch};setCurrent(next);backup(next);setSaveStatus("等待保存…");}
   const loadList=useCallback(async()=>{const data=await api<{posts:ListPost[]}>("posts");setPosts(data.posts);},[]);
@@ -58,7 +59,7 @@ export function AdminEditor({initialized,signOutUrl,onSignOut}:{initialized:bool
   async function flushSave(force=false){if(saving.current&&!await saving.current)return false;for(let i=0;i<3;i++){const current=latest.current;if(!current)return false;if(!force&&signature(current)===savedSignature.current)return true;if(!await saveDraft(force))return false;force=false;}return latest.current?signature(latest.current)===savedSignature.current:false;}
 
   useEffect(()=>{folderInput.current?.setAttribute("webkitdirectory","");if(!initialized)return;void loadList().catch(reason=>setError(errorText(reason)));void openPost("about");},[initialized,loadList]);
-  useEffect(()=>{if(!post||!dirty||recovery)return;const timer=setTimeout(()=>void saveFunction.current(),900);return()=>clearTimeout(timer);},[post?.title,post?.section,post?.draft_markdown,post?.draft_avatar,post?.revision,dirty,recovery]);
+  useEffect(()=>{if(!post||!dirty||recovery||deleteConfirm)return;const timer=setTimeout(()=>void saveFunction.current(),900);return()=>clearTimeout(timer);},[post?.title,post?.section,post?.draft_markdown,post?.draft_avatar,post?.revision,dirty,recovery,deleteConfirm]);
   useEffect(()=>{const beforeUnload=(event:BeforeUnloadEvent)=>{if(latest.current&&signature(latest.current)!==savedSignature.current){backup(latest.current);event.preventDefault();event.returnValue="";}};window.addEventListener("beforeunload",beforeUnload);return()=>window.removeEventListener("beforeunload",beforeUnload);},[]);
 
   async function bindOwner(){setWorking("绑定站主");setError("");try{await api("initialize",{method:"POST",body:"{}"});location.reload();}catch(reason){setError(errorText(reason));setWorking("");}}
@@ -81,6 +82,24 @@ export function AdminEditor({initialized,signOutUrl,onSignOut}:{initialized:bool
       if(!await flushSave())return;const current=latest.current!;const {post:stored}=await api<{post:Post}>(`posts/${current.id}/unpublish`,{method:"POST",body:JSON.stringify({revision:current.revision})});
       if(latest.current?.id===stored.id)setCurrent({...latest.current,published_title:null,published_markdown:null,published_avatar:null,published_section:null,published_at:null});setSaveStatus("已撤回 · 草稿保留");await loadList();
     }catch(reason){setError(errorText(reason));}finally{setWorking("");}
+  }
+  async function deleteDraft(){
+    const current=latest.current;
+    if(!current||current.id==="about"||current.published_markdown!==null)return;
+    setWorking("删除草稿");setError("");
+    try{
+      if(saving.current)await saving.current;
+      const {post:stored}=await api<{post:Post}>(`posts/${current.id}`);
+      if(stored.published_markdown!==null)throw new Error("这篇文章已发布，请先撤回发布。");
+      const images=new Set([...mediaIds(stored.draft_markdown,stored.draft_avatar),...mediaIds(current.draft_markdown,current.draft_avatar)]);
+      await api(`posts/${current.id}`,{method:"DELETE"});
+      try{localStorage.removeItem(`blog-draft-${current.id}`);}catch{}
+      savedSignature.current="";setCurrent(null);setRecovery(null);setSaveStatus("草稿已删除");
+      let failed=false;
+      for(const id of images){try{await api(`media/${id}`,{method:"DELETE"});}catch(reason){if(!errorText(reason).includes("仍被文章引用"))failed=true;}}
+      await loadList();
+      if(failed)setError("草稿已删除，部分配图清理失败。请稍后重试或联系站点维护者。");
+    }catch(reason){setError(errorText(reason));}finally{setDeleteConfirm(false);setWorking("");}
   }
   function insert(before:string,after="",placeholder="文字"){
     const current=latest.current;if(!current)return;const input=textarea.current;const start=input?.selectionStart??current.draft_markdown.length;const end=input?.selectionEnd??start;const selection=current.draft_markdown.slice(start,end)||placeholder;
@@ -126,6 +145,8 @@ export function AdminEditor({initialized,signOutUrl,onSignOut}:{initialized:bool
       {recovery&&<div className="notice"><p>本机还有未同步的编辑内容。恢复后可以继续保存，也可以先导出备份。</p><button className="button" onClick={()=>{const current=latest.current!;edit({title:recovery.title,section:recovery.section,draft_markdown:recovery.draft_markdown,draft_avatar:recovery.draft_avatar,revision:current.revision});setRecovery(null);}}>恢复本机内容</button> <button className="button" onClick={()=>{try{localStorage.removeItem(`blog-draft-${recovery.id}`);}catch{}setRecovery(null);}}>使用服务器版本</button></div>}
       {post&&<><div className="editor-meta"><input aria-label="文章标题" placeholder="文章标题" value={post.title} maxLength={200} onChange={event=>edit({title:event.target.value})}/>{post.id!=="about"&&<select aria-label="文章栏目" value={post.section} onChange={event=>edit({section:event.target.value as Section})}>{sections.map(section=><option value={section} key={section}>{sectionLabels[section]}</option>)}</select>}</div>
       <div className="editor-actions"><span className="save-status" role="status">{saveStatus}{dirty?" · 有未保存修改":""}</span><button className="button" onClick={()=>void saveDraft(true)} disabled={Boolean(working)}>保存草稿</button><button className="button" onClick={exportMarkdown}>导出 Markdown</button><button className="button primary" onClick={()=>void publish()} disabled={Boolean(working)||missing.length>0||Boolean(recovery)}>{working==="发布"?"正在发布…":post.published_markdown!==null?"更新发布":"发布"}</button>{post.published_markdown!==null&&<button className="button" onClick={()=>setWithdrawConfirm(true)} disabled={Boolean(working)}>撤回发布</button>}</div>
+      {post.id!=="about"&&post.published_markdown===null&&<button className="text-button" disabled={Boolean(working)||Boolean(recovery)} onClick={()=>setDeleteConfirm(true)}>删除草稿</button>}
+      {deleteConfirm&&<div className="notice" role="alertdialog" aria-label="确认删除草稿"><p>永久删除“{post.title||"无标题草稿"}”及其本机备份，并清理它引用的配图。其他文章仍引用的图片会保留。</p><button className="button" disabled={Boolean(working)} onClick={()=>setDeleteConfirm(false)}>取消</button> <button className="button" disabled={Boolean(working)} onClick={()=>void deleteDraft()}>确认删除草稿</button></div>}
       {withdrawConfirm&&<div className="notice" role="alertdialog" aria-label="确认撤回发布"><p>撤回后，游客将无法阅读这篇内容。草稿会保留。</p><button className="button" onClick={()=>setWithdrawConfirm(false)}>取消</button> <button className="button" onClick={()=>void unpublish()} disabled={Boolean(working)}>确认撤回</button></div>}
       {post.published_markdown!==null&&<p className="save-status">当前为已发布内容的草稿。编辑和保存不会改变线上版本，点击“更新发布”后才会生效。</p>}
       {post.id==="about"&&<div className="profile-avatar"><PrivateImage src={post.draft_avatar?`/api/admin/media/${post.draft_avatar}`:"/images/avatar.jpg"} alt="头像预览"/><button className="button" onClick={()=>avatarInput.current?.click()} disabled={Boolean(working)}>上传头像</button>{post.draft_avatar&&<button className="button" onClick={()=>edit({draft_avatar:null})}>使用原图</button>}<span className="save-status">随 About 一起发布</span></div>}
