@@ -66,6 +66,6 @@ function Admin(){
 function App(){
   const pathname=location.pathname.replace(/\/$/,"")||"/";const section=pathname.slice(1) as Section;const id=new URLSearchParams(location.search).get("post");
   const page=pathname==="/"?<Home/>:pathname==="/admin"?<Admin/>:pathname==="/admin/callback"?<Callback/>:sections.includes(section as typeof sections[number])?id?<Article id={id} section={section}/>:<Collection section={section}/>:<main className="page-frame main-content"><h1>页面不存在</h1><p><a href="/">返回首页</a></p></main>;
-  return <div className="page-shell"><Navigation pathname={pathname}/>{page}<footer className="site-footer"><a href="/admin/">管理</a></footer></div>;
+  return <div className="page-shell"><Navigation pathname={pathname}/>{page}</div>;
 }
 createRoot(document.getElementById("root")!).render(<App/>);
