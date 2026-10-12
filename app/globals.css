@@ -111,6 +111,10 @@ body { min-width: 280px; min-height: 100svh; margin: 0; background: var(--paper)
 :root[data-theme="dark"] .icon-sun { display: block; }
 :where(a, button):focus-visible { outline: 2px solid var(--ink); outline-offset: 5px; }
 .main-content { flex: 1; padding-top: 48px; padding-bottom: 80px; }
+.page-loading { position: fixed; inset: 0; display: grid; place-items: center; pointer-events: none; }
+.loading-line { position: relative; display: block; width: 64px; height: 2px; overflow: hidden; border-radius: 1px; background: var(--line); }
+.loading-line::after { content: ""; position: absolute; inset: 0 auto 0 0; width: 24px; border-radius: inherit; background: var(--muted); animation: loading-line 1.2s ease-in-out infinite; }
+@keyframes loading-line { from { transform: translateX(-100%); } to { transform: translateX(267%); } }
 h1 { margin: 0; font-size: 32px; font-weight: 500; line-height: 1.5; letter-spacing: -0.025em; }
 .about-heading { display: grid; grid-template-columns: 200px minmax(0, 1fr); align-items: start; gap: 36px; }
 .about-copy { padding-top: 10px; }

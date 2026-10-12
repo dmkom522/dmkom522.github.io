@@ -14,7 +14,7 @@ function useContent<T>(path:string){
   const [state,setState]=useState<{data:T|null;error:string}>({data:null,error:""});
   useEffect(()=>{const controller=new AbortController();setState({data:null,error:""});void request<T>(path,{signal:controller.signal}).then(data=>setState({data,error:""})).catch(error=>{if(!controller.signal.aborted)setState({data:null,error:error instanceof TypeError?"无法连接内容服务，请稍后重试。":error instanceof Error?error.message:"暂时无法读取内容。"});});return()=>controller.abort();},[path]);return state;
 }
-function LoadState({error}:{error:string}){return error?<p className="notice" role="alert">{error} <button className="text-button" onClick={()=>location.reload()}>重新加载</button></p>:<p className="save-status" role="status">正在读取…</p>;}
+function LoadState({error}:{error:string}){return error?<p className="notice" role="alert">{error} <button className="text-button" onClick={()=>location.reload()}>重新加载</button></p>:<div className="page-loading" role="status" aria-label="正在加载" aria-busy="true"><span className="loading-line" aria-hidden="true"/></div>;}
 function Home(){
   const {data,error}=useContent<{title:string;markdown:string;avatar:string}>("/api/content/about");
   useEffect(()=>{document.title=data?.title||"About";},[data?.title]);
