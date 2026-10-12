@@ -2,6 +2,7 @@ import {useEffect,useRef,useState} from "react";
 import {createRoot} from "react-dom/client";
 import {Navigation} from "@/app/navigation";
 import {Markdown} from "@/app/markdown";
+import {ArticleReading} from "@/app/article-reading";
 import {AdminEditor} from "@/app/admin/editor";
 import {apiFetch,apiUrl,articleUrl,mediaUrl,sessionToken,setSessionToken} from "@/lib/api-client";
 import {formatDate,sectionLabels,sections,type Section,type PublicPost} from "@/lib/content";
@@ -28,7 +29,7 @@ function Collection({section}:{section:Section}){
 function Article({id,section}:{id:string;section:Section}){
   const {data,error}=useContent<{post:PublicPost}>(`/api/content/${encodeURIComponent(id)}`);const post=data?.post;
   useEffect(()=>{document.title=post?.title||"文章";},[post?.title]);
-  return <main className="page-frame main-content"><a className="back-link" href={`/${section}/`}>← {sectionLabels[section]}</a>{post&&post.section===section?<article><h1>{post.title}</h1><time className="article-date" dateTime={new Date(post.published_at).toISOString()}>{formatDate(post.published_at)}</time><Markdown source={post.markdown}/></article>:<LoadState error={post?"文章不在当前栏目。":error}/>}</main>;
+  return <main className="page-frame main-content article-page"><a className="back-link" href={`/${section}/`}>← {sectionLabels[section]}</a>{post&&post.section===section?<ArticleReading key={post.id} post={post}/>:<LoadState error={post?"文章不在当前栏目。":error}/>}</main>;
 }
 function LoginButton(){
   const [working,setWorking]=useState(false);const [error,setError]=useState("");
