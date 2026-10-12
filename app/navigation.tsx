@@ -26,9 +26,10 @@ function Search() {
     </div>}
   </div>;
 }
+const navigationLabels:Record<Section,string>={about:"Home",notes:"Notes","paper-reading":"Paper reading",projects:"Projects"};
 export function Navigation({pathname}:{pathname:string}) {
   pathname=pathname.replace(/\/$/,"")||"/";
   return <header className="site-header"><nav className="site-nav" aria-label="主导航">
-    {(["about","notes","paper-reading","projects"] as Section[]).map(section=>{const href=section==="about"?"/":`/${section}`;const active=section==="about"?pathname==="/":pathname===href||pathname.startsWith(href+"/");return <a key={section} className="nav-link" href={href} aria-current={active?"page":undefined}>{sectionLabels[section]}</a>;})}
+    {(["about","notes","paper-reading","projects"] as Section[]).map(section=>{const href=section==="about"?"/":`/${section}`;const active=section==="about"?pathname==="/":pathname===href||pathname.startsWith(href+"/");return <a key={section} className="nav-link" href={href} aria-current={active?"page":undefined}>{navigationLabels[section]}</a>;})}
   </nav><div className="header-tools"><Search/><ThemeToggle/></div></header>;
 }
