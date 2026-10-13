@@ -1,6 +1,6 @@
 export const sections = ["notes", "paper-reading", "projects"] as const;
 export type Section = typeof sections[number] | "about";
-export const sectionLabels: Record<Section, string> = { notes: "notes", "paper-reading": "paper reading", projects: "projects", about: "about" };
+export const sectionLabels: Record<Section, string> = { notes: "Notes", "paper-reading": "Paper reading", projects: "Projects", about: "About" };
 export const exampleAbout = "这里记录我的学习笔记、论文阅读，以及项目中的一些尝试。\n\n把零散的想法和遇到的问题整理清楚，也留给以后的自己回看。";
 export type Post = {
   id: string; section: Section; title: string; draft_markdown: string; draft_avatar: string | null;
