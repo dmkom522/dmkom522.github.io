@@ -57,7 +57,7 @@ async function handler(request: Request, context: Context): Promise<Response> {
     }
     const id = path[1]; let post = await getPost(id);
     if (id === "about" && !post && (method === "GET" || method === "PUT")) {
-      if (method === "GET") return json({ post: {id:"about",section:"about",title:"About",draft_markdown:exampleAbout,draft_avatar:null,published_markdown:null,published_title:null,published_avatar:null,published_section:null,revision:0,created_at:Date.now(),updated_at:Date.now(),published_at:null,draft_version:"",has_published:0} });
+      if (method === "GET") return json({ post: {id:"about",section:"about",title:"About",draft_markdown:exampleAbout,draft_avatar:null,published_markdown:null,published_title:null,published_avatar:null,published_section:null,published_created_at:null,published_updated_at:null,revision:0,created_at:Date.now(),updated_at:Date.now(),published_at:null,draft_version:"",has_published:0} });
       await sql().prepare("INSERT OR IGNORE INTO posts (id,section,title,created_at,updated_at) VALUES ('about','about','About',?,?)").bind(Date.now(),Date.now()).run(); post = await getPost(id);
     }
     if (!post) throw new HttpError(404, "文章不存在。");
@@ -66,10 +66,13 @@ async function handler(request: Request, context: Context): Promise<Response> {
       const body = await readJson(request);
       if (typeof body.title !== "string" || body.title.length > 200 || typeof body.markdown !== "string" || body.markdown.length > 1_000_000 || !Number.isInteger(body.revision) || !isSection(body.section) || (id === "about") !== (body.section === "about")) throw new HttpError(400, "标题、正文或栏目格式有误。");
       const avatar = typeof body.avatar === "string" ? body.avatar : null;
+      const createdAt=body.created_at===undefined?post.created_at:body.created_at;
+      if(!Number.isSafeInteger(createdAt)||createdAt<=0||createdAt>Date.now())throw new HttpError(400,"写于日期无效，请选择今天或更早的日期。");
       const ids = mediaIds(body.markdown, avatar);
       for (const assetId of ids) if (!await sql().prepare("SELECT id FROM assets WHERE id = ?").bind(assetId).first()) throw new HttpError(400, "正文含有不存在的配图，请重新上传。");
       const token = crypto.randomUUID(); const now = Date.now();
-      const queries = [sql().prepare("UPDATE posts SET title=?,section=?,draft_markdown=?,draft_avatar=?,updated_at=?,revision=revision+1,draft_version=? WHERE id=? AND revision=?").bind(body.title.trim(),body.section,body.markdown,avatar,now,token,id,body.revision),
+      const contentChanged=body.title.trim()!==post.title||body.section!==post.section||body.markdown!==post.draft_markdown||avatar!==post.draft_avatar;
+      const queries = [sql().prepare("UPDATE posts SET published_created_at=COALESCE(published_created_at,CASE WHEN published_markdown IS NOT NULL THEN created_at END),published_updated_at=COALESCE(published_updated_at,CASE WHEN published_markdown IS NOT NULL THEN MIN(updated_at,published_at) END),title=?,section=?,draft_markdown=?,draft_avatar=?,created_at=?,updated_at=?,revision=revision+1,draft_version=? WHERE id=? AND revision=?").bind(body.title.trim(),body.section,body.markdown,avatar,createdAt,contentChanged?now:post.updated_at,token,id,body.revision),
         sql().prepare("UPDATE post_assets SET draft_referenced=0 WHERE post_id=? AND EXISTS(SELECT 1 FROM posts WHERE id=? AND draft_version=?)").bind(id,id,token)];
       for (const assetId of ids) queries.push(sql().prepare("INSERT INTO post_assets (post_id,asset_id,draft_referenced,published_referenced) SELECT ?,?,1,0 WHERE EXISTS(SELECT 1 FROM posts WHERE id=? AND draft_version=?) ON CONFLICT(post_id,asset_id) DO UPDATE SET draft_referenced=1").bind(id,assetId,id,token));
       const results = await sql().batch(queries);
@@ -81,8 +84,8 @@ async function handler(request: Request, context: Context): Promise<Response> {
       if (path[2] === "publish" && id !== "about" && !post.title.trim()) throw new HttpError(400, "发布前请填写标题。");
       if (path[2] === "publish" && missingImages(post.draft_markdown).length) throw new HttpError(400, "请补齐本地配图后再发布。");
       const query = path[2] === "publish" ?
-        sql().prepare("UPDATE posts SET published_title=title,published_markdown=draft_markdown,published_avatar=draft_avatar,published_section=section,has_published=1,published_at=? WHERE id=? AND revision=?").bind(Date.now(),id,body.revision) :
-        sql().prepare("UPDATE posts SET published_title=NULL,published_markdown=NULL,published_avatar=NULL,published_section=NULL,published_at=NULL WHERE id=? AND revision=?").bind(id,body.revision);
+        sql().prepare("UPDATE posts SET published_title=title,published_markdown=draft_markdown,published_avatar=draft_avatar,published_section=section,published_created_at=created_at,published_updated_at=updated_at,has_published=1,published_at=? WHERE id=? AND revision=?").bind(Date.now(),id,body.revision) :
+        sql().prepare("UPDATE posts SET published_title=NULL,published_markdown=NULL,published_avatar=NULL,published_section=NULL,published_created_at=NULL,published_updated_at=NULL,published_at=NULL WHERE id=? AND revision=?").bind(id,body.revision);
       const results = await sql().batch([query, sql().prepare("UPDATE post_assets SET published_referenced=CASE WHEN EXISTS (SELECT 1 FROM posts WHERE id=? AND published_markdown IS NOT NULL AND (instr(published_markdown, '/api/media/' || post_assets.asset_id)>0 OR published_avatar=post_assets.asset_id)) THEN 1 ELSE 0 END WHERE post_id=?").bind(id,id)]);
       if (!results[0].meta.changes) throw new HttpError(409, "文章已更新，请重试。");
       return json({post: await getPost(id)});

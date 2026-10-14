@@ -2,14 +2,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { Markdown } from "@/app/markdown";
-import { mediaIds, sectionLabels, sections, type Post, type Section } from "@/lib/content";
+import { dateInputValue, parseDateInput, mediaIds, sectionLabels, sections, type Post, type Section } from "@/lib/content";
 import { missingImages, parseMarkdownFile, resolveImages } from "@/lib/markdown-import";
 import {apiFetch,apiOrigin} from "@/lib/api-client";
 import {PrivateImage} from "@/app/private-image";
 
 type ListPost={id:string;section:Section;title:string;updated_at:number;published_at:number|null;is_published:number};
 type ImportState={files:File[];file:File;title:string;markdown:string;section:Section;missing:string[];busy:boolean;error:string};
-function signature(post:Post){return JSON.stringify([post.title,post.section,post.draft_markdown,post.draft_avatar]);}
+function signature(post:Post){return JSON.stringify([post.title,post.section,post.draft_markdown,post.draft_avatar,post.created_at]);}
 async function api<T>(path:string,options:RequestInit={}):Promise<T>{
   const response=await apiFetch(`/api/admin/${path}`,{...options,headers:{...(options.body instanceof FormData?{}:{"Content-Type":"application/json"}),...options.headers}});
   const data=await response.json() as T&{error?:string};if(!response.ok)throw new Error(data.error||"操作失败，请稍后重试。");return data;
@@ -47,10 +47,10 @@ export function AdminEditor({initialized,signOutUrl,onSignOut}:{initialized:bool
     const sent={...current};const sentSignature=signature(sent);if(!force&&sentSignature===savedSignature.current)return true;
     setSaveStatus("正在保存…");setError("");
     const operation=(async()=>{try{
-      const {post:stored}=await api<{post:Post}>(`posts/${sent.id}`,{method:"PUT",body:JSON.stringify({title:sent.title,section:sent.section,markdown:sent.draft_markdown,avatar:sent.draft_avatar,revision:sent.revision})});
+      const {post:stored}=await api<{post:Post}>(`posts/${sent.id}`,{method:"PUT",body:JSON.stringify({title:sent.title,section:sent.section,markdown:sent.draft_markdown,avatar:sent.draft_avatar,created_at:sent.created_at,revision:sent.revision})});
       savedSignature.current=sentSignature;
       if(latest.current?.id===stored.id){const next={...latest.current,revision:stored.revision,updated_at:stored.updated_at,draft_version:stored.draft_version};setCurrent(next);
-        if(signature(next)===sentSignature){try{localStorage.removeItem(`blog-draft-${next.id}`);}catch{}setSaveStatus(`已保存 · ${new Date(stored.updated_at).toLocaleTimeString("zh-CN",{hour12:false,timeZone:"Asia/Shanghai"})}`);}else{backup(next);setSaveStatus("等待保存…");}}
+        if(signature(next)===sentSignature){try{localStorage.removeItem(`blog-draft-${next.id}`);}catch{}setSaveStatus(`已保存 · ${new Date().toLocaleTimeString("zh-CN",{hour12:false,timeZone:"Asia/Shanghai"})}`);}else{backup(next);setSaveStatus("等待保存…");}}
       void loadList().catch(()=>{});return true;
     }catch(reason){if(latest.current)backup(latest.current);setSaveStatus("保存失败 · 内容已保留");setError(errorText(reason));return false;}finally{saving.current=null;}})();
     saving.current=operation;return operation;
@@ -59,7 +59,7 @@ export function AdminEditor({initialized,signOutUrl,onSignOut}:{initialized:bool
   async function flushSave(force=false){if(saving.current&&!await saving.current)return false;for(let i=0;i<3;i++){const current=latest.current;if(!current)return false;if(!force&&signature(current)===savedSignature.current)return true;if(!await saveDraft(force))return false;force=false;}return latest.current?signature(latest.current)===savedSignature.current:false;}
 
   useEffect(()=>{folderInput.current?.setAttribute("webkitdirectory","");if(!initialized)return;void loadList().catch(reason=>setError(errorText(reason)));void openPost("about");},[initialized,loadList]);
-  useEffect(()=>{if(!post||!dirty||recovery||deleteConfirm)return;const timer=setTimeout(()=>void saveFunction.current(),900);return()=>clearTimeout(timer);},[post?.title,post?.section,post?.draft_markdown,post?.draft_avatar,post?.revision,dirty,recovery,deleteConfirm]);
+  useEffect(()=>{if(!post||!dirty||recovery||deleteConfirm)return;const timer=setTimeout(()=>void saveFunction.current(),900);return()=>clearTimeout(timer);},[post?.title,post?.section,post?.draft_markdown,post?.draft_avatar,post?.created_at,post?.revision,dirty,recovery,deleteConfirm]);
   useEffect(()=>{const beforeUnload=(event:BeforeUnloadEvent)=>{if(latest.current&&signature(latest.current)!==savedSignature.current){backup(latest.current);event.preventDefault();event.returnValue="";}};window.addEventListener("beforeunload",beforeUnload);return()=>window.removeEventListener("beforeunload",beforeUnload);},[]);
 
   async function bindOwner(){setWorking("绑定站主");setError("");try{await api("initialize",{method:"POST",body:"{}"});location.reload();}catch(reason){setError(errorText(reason));setWorking("");}}
@@ -72,7 +72,7 @@ export function AdminEditor({initialized,signOutUrl,onSignOut}:{initialized:bool
       if(!await flushSave(true))return;const current=latest.current;if(!current)return;
       if(missingImages(current.draft_markdown).length)throw new Error("请先补齐本地配图，再发布文章。");
       const {post:stored}=await api<{post:Post}>(`posts/${current.id}/publish`,{method:"POST",body:JSON.stringify({revision:current.revision})});
-      if(latest.current?.id===stored.id)setCurrent({...latest.current,published_title:stored.published_title,published_markdown:stored.published_markdown,published_avatar:stored.published_avatar,published_section:stored.published_section,published_at:stored.published_at,has_published:stored.has_published});
+      if(latest.current?.id===stored.id)setCurrent({...latest.current,published_title:stored.published_title,published_markdown:stored.published_markdown,published_avatar:stored.published_avatar,published_section:stored.published_section,published_created_at:stored.published_created_at,published_updated_at:stored.published_updated_at,published_at:stored.published_at,has_published:stored.has_published});
       setSaveStatus("已发布");await loadList();
     }catch(reason){setError(errorText(reason));}finally{setWorking("");}
   }
@@ -80,7 +80,7 @@ export function AdminEditor({initialized,signOutUrl,onSignOut}:{initialized:bool
     if(!latest.current)return;setWithdrawConfirm(false);
     setWorking("撤回");setError("");try{
       if(!await flushSave())return;const current=latest.current!;const {post:stored}=await api<{post:Post}>(`posts/${current.id}/unpublish`,{method:"POST",body:JSON.stringify({revision:current.revision})});
-      if(latest.current?.id===stored.id)setCurrent({...latest.current,published_title:null,published_markdown:null,published_avatar:null,published_section:null,published_at:null});setSaveStatus("已撤回 · 草稿保留");await loadList();
+      if(latest.current?.id===stored.id)setCurrent({...latest.current,published_title:null,published_markdown:null,published_avatar:null,published_section:null,published_created_at:null,published_updated_at:null,published_at:null});setSaveStatus("已撤回 · 草稿保留");await loadList();
     }catch(reason){setError(errorText(reason));}finally{setWorking("");}
   }
   async function deleteDraft(){
@@ -142,8 +142,9 @@ export function AdminEditor({initialized,signOutUrl,onSignOut}:{initialized:bool
       {posts.filter(item=>item.id!=="about").map(item=><li key={item.id}><button aria-current={post?.id===item.id?"true":undefined} onClick={()=>void openPost(item.id)} disabled={Boolean(working)}>{item.title||"无标题草稿"}<small>{sectionLabels[item.section]} · {item.is_published?"已发布":"草稿"}</small></button></li>)}</ul>
     </aside><section className="editor-area" aria-label="Markdown 编辑器">
       {error&&<div className="notice" role="alert"><p>{error}</p>{error.includes("其他窗口更新")&&post&&<button className="button" onClick={()=>void openPost(post.id,true)}>重新读取并恢复本机内容</button>}</div>}
-      {recovery&&<div className="notice"><p>本机还有未同步的编辑内容。恢复后可以继续保存，也可以先导出备份。</p><button className="button" onClick={()=>{const current=latest.current!;edit({title:recovery.title,section:recovery.section,draft_markdown:recovery.draft_markdown,draft_avatar:recovery.draft_avatar,revision:current.revision});setRecovery(null);}}>恢复本机内容</button> <button className="button" onClick={()=>{try{localStorage.removeItem(`blog-draft-${recovery.id}`);}catch{}setRecovery(null);}}>使用服务器版本</button></div>}
+      {recovery&&<div className="notice"><p>本机还有未同步的编辑内容。恢复后可以继续保存，也可以先导出备份。</p><button className="button" onClick={()=>{const current=latest.current!;edit({title:recovery.title,section:recovery.section,draft_markdown:recovery.draft_markdown,draft_avatar:recovery.draft_avatar,created_at:recovery.created_at,revision:current.revision});setRecovery(null);}}>恢复本机内容</button> <button className="button" onClick={()=>{try{localStorage.removeItem(`blog-draft-${recovery.id}`);}catch{}setRecovery(null);}}>使用服务器版本</button></div>}
       {post&&<><div className="editor-meta"><input aria-label="文章标题" placeholder="文章标题" value={post.title} maxLength={200} onChange={event=>edit({title:event.target.value})}/>{post.id!=="about"&&<select aria-label="文章栏目" value={post.section} onChange={event=>edit({section:event.target.value as Section})}>{sections.map(section=><option value={section} key={section}>{sectionLabels[section]}</option>)}</select>}</div>
+      {post.id!=="about"&&<label className="writing-date">写于<input type="date" aria-label="写于日期" value={dateInputValue(post.created_at)} max={dateInputValue(Date.now())} onChange={event=>{const date=parseDateInput(event.target.value);if(date!==null)edit({created_at:date});}}/></label>}
       <div className="editor-actions"><span className="save-status" role="status">{saveStatus}{dirty?" · 有未保存修改":""}</span><button className="button" onClick={()=>void saveDraft(true)} disabled={Boolean(working)}>保存草稿</button><button className="button" onClick={exportMarkdown}>导出 Markdown</button><button className="button primary" onClick={()=>void publish()} disabled={Boolean(working)||missing.length>0||Boolean(recovery)}>{working==="发布"?"正在发布…":post.published_markdown!==null?"更新发布":"发布"}</button>{post.published_markdown!==null&&<button className="button" onClick={()=>setWithdrawConfirm(true)} disabled={Boolean(working)}>撤回发布</button>}</div>
       {post.id!=="about"&&post.published_markdown===null&&<button className="text-button" disabled={Boolean(working)||Boolean(recovery)} onClick={()=>setDeleteConfirm(true)}>删除草稿</button>}
       {deleteConfirm&&<div className="notice" role="alertdialog" aria-label="确认删除草稿"><p>永久删除“{post.title||"无标题草稿"}”及其本机备份，并清理它引用的配图。其他文章仍引用的图片会保留。</p><button className="button" disabled={Boolean(working)} onClick={()=>setDeleteConfirm(false)}>取消</button> <button className="button" disabled={Boolean(working)} onClick={()=>void deleteDraft()}>确认删除草稿</button></div>}

@@ -8,6 +8,7 @@ export const posts = sqliteTable("posts", {
   draftMarkdown: text("draft_markdown").notNull().default(""), draftAvatar: text("draft_avatar"),
   publishedTitle: text("published_title"), publishedMarkdown: text("published_markdown"), publishedAvatar: text("published_avatar"), publishedSection: text("published_section"),
   createdAt: integer("created_at").notNull(), updatedAt: integer("updated_at").notNull(), publishedAt: integer("published_at"),
+  publishedCreatedAt: integer("published_created_at"), publishedUpdatedAt: integer("published_updated_at"),
   revision: integer("revision").notNull().default(0), draftVersion: text("draft_version").notNull().default(""),
   hasPublished: integer("has_published").notNull().default(0),
 });

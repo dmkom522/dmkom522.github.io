@@ -140,7 +140,9 @@ a { color: inherit; text-underline-offset: 3px; }
 .post-list time, .article-date, .back-link { color: var(--muted); font-size: 13px; }
 .post-list time { flex-shrink: 0; }
 .back-link { display: inline-block; margin-bottom: 22px; text-decoration: none; }
-.article-date { display: block; margin: 8px 0 32px; }
+.article-date { display: flex; flex-wrap: wrap; gap: 6px 20px; margin: 8px 0 32px; }
+.writing-date { display: flex; align-items: center; gap: 10px; margin: 14px 0; color: var(--muted); font-size: 14px; }
+.writing-date input { padding: 6px 8px; border: 1px solid var(--line); border-radius: 3px; background: transparent; color: var(--ink); font: inherit; }
 .article-page { width: min(1028px, calc(100% - 96px)); margin-inline: auto; }
 .article-layout { display: grid; grid-template-columns: minmax(0, 740px); }
 .article-layout.has-outline { grid-template-columns: minmax(0, 1fr) 240px; gap: 48px; align-items: start; }

@@ -48,7 +48,7 @@ export function ArticleReading({post}:{post:PublicPost}){
   })}</ul>;}
 
   return <div className={`article-layout${outline.length?" has-outline":""}`}>
-    <article className="article-prose" ref={prose}><h1>{post.title}</h1><time className="article-date" dateTime={new Date(post.published_at).toISOString()}>{formatDate(post.published_at)}</time><Markdown source={post.markdown} headingAnchors/></article>
+    <article className="article-prose" ref={prose}><h1>{post.title}</h1><div className="article-date"><span>写于 <time dateTime={new Date(post.created_at).toISOString()}>{formatDate(post.created_at)}</time></span><span>最后编辑于 <time dateTime={new Date(post.updated_at).toISOString()}>{formatDate(post.updated_at)}</time></span></div><Markdown source={post.markdown} headingAnchors/></article>
     {outline.length>0&&<aside className="article-outline" data-mobile-open={mobileOpen}>
       <h2 className="outline-heading">目录</h2>
       <button className="outline-mobile-toggle" aria-expanded={mobileOpen} aria-controls="article-outline-nav" onClick={()=>setMobileOpen(!mobileOpen)}>目录<Chevron/></button>

@@ -22,9 +22,9 @@ function Home(){
   return <main className="page-frame main-content" id="about" aria-labelledby="about-title">{data?<div className="about-heading"><img className="avatar-image" src={mediaUrl(data.avatar)} width="200" height="200" alt="头像"/><div className="about-copy"><h1 id="about-title">{data.title}</h1><Markdown source={data.markdown}/></div></div>:<LoadState error={error}/>}</main>;
 }
 function Collection({section}:{section:Section}){
-  const {data,error}=useContent<{posts:Pick<PublicPost,"id"|"section"|"title"|"published_at">[]}>(`/api/content?section=${section}`);
+  const {data,error}=useContent<{posts:Pick<PublicPost,"id"|"section"|"title"|"created_at"|"published_at">[]}>(`/api/content?section=${section}`);
   useEffect(()=>{document.title=sectionLabels[section];},[section]);
-  return <main className="page-frame main-content"><h1>{sectionLabels[section]}</h1>{!data?<LoadState error={error}/>:<ul className="post-list">{data.posts.map(post=><li key={post.id}><a href={articleUrl(post.section,post.id)}>{post.title}</a><time dateTime={new Date(post.published_at).toISOString()}>{formatDate(post.published_at)}</time></li>)}</ul>}</main>;
+  return <main className="page-frame main-content"><h1>{sectionLabels[section]}</h1>{!data?<LoadState error={error}/>:<ul className="post-list">{data.posts.map(post=><li key={post.id}><a href={articleUrl(post.section,post.id)}>{post.title}</a><time dateTime={new Date(post.created_at).toISOString()}>{formatDate(post.created_at)}</time></li>)}</ul>}</main>;
 }
 function Article({id,section}:{id:string;section:Section}){
   const {data,error}=useContent<{post:PublicPost}>(`/api/content/${encodeURIComponent(id)}`);const post=data?.post;
